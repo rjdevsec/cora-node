@@ -1,0 +1,49 @@
+
+<div class="card">
+  <div class="card-head"><h2>Executive summary</h2></div>
+  <div class="summary-lead">{% for line in impact.summary %}<p>{{ line }}</p>{% endfor %}</div>
+</div>
+
+<div class="grid cols-4" style="margin-top:16px">
+  <div class="card tight stat accent-crit"><span class="label">Risks described</span><span class="value">{{ impact.statements|length }}</span><span class="sub">Every issue and risk from steps 1–9</span></div>
+  <div class="card tight stat accent-info"><span class="label">Impact tolerance</span><span class="value">{{ ((run.impact_tolerance_hours)|g) }}h</span><span class="sub">{% if run.dr_results|has %}Set against DR test results{% else %}Recovery not assessed in this run{% endif %}</span></div>
+  <div class="card tight stat accent-crit"><span class="label">Critical findings</span><span class="value">{{ impact.critical }}</span></div>
+  <div class="card tight stat accent-serious"><span class="label">High findings</span><span class="value">{{ impact.high }}</span></div>
+</div>
+
+{% if impact.actions|has %}
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>Priority actions</h2><span class="spacer"></span><span class="small muted">Top {{ impact.actions|length }} by severity and weighted score</span></div>
+  <table>
+    <thead><tr><th>Urgency</th><th>Action</th><th>Why it matters to the service</th><th>Owner</th></tr></thead>
+    <tbody>
+    {% for st in impact.actions %}
+    <tr><td><span class="badge {{ 'crit' if st.urgency == 'Immediate' else 'bad' }}">{{ st.urgency }}</span></td>
+      <td><strong>{{ st.action }}</strong></td>
+      <td class="small">{{ st.service_effect }}{% if st.scenarios|has %}<div class="pill-list" style="margin-top:6px">{% for sc in st.scenarios %}<span class="tag">{{ sc }}</span>{% endfor %}</div>{% endif %}</td>
+      <td class="small nowrap">{{ st.owner }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+
+<div class="card">
+  <div class="card-head"><h2>Impact of each critical and high risk</h2><span class="spacer"></span><span class="small muted">Grouped by the step that found it</span></div>
+  {% for title, items in impact_groups %}
+  <h3 style="margin:16px 0 8px">{{ title }} <span class="muted small">· {{ items|length }}</span></h3>
+  {% for st in items %}
+  <div class="cause">
+    <div class="row"><span class="badge {{ 'crit' if st.finding.severity == 'Critical' else 'bad' }}">{{ st.finding.severity }}</span>
+      {% if st.finding.asset|has %}<span class="mono"><strong>{{ st.finding.subject }}</strong></span>{% else %}<strong>{{ st.finding.subject }}</strong> <span class="tag">application</span>{% endif %}
+      <span class="spacer"></span><span class="small muted">Score {{ ((st.finding.effective)|g) }} · owner {{ st.owner }}</span></div>
+    <p style="margin:8px 0 4px">{{ st.meaning }}</p>
+    <p class="small muted" style="margin:0">{{ st.service_effect }} <a href="{{ url('result_detail', {run_id: run.id, result_id: st.finding.result.id}) }}">{{ st.finding.result.check_id }} evidence →</a></p>
+  </div>
+  {% endfor %}
+  {% else %}<p class="muted" style="margin:0">No critical or high risks were found.</p>
+  {% endfor %}
+</div>
+<p class="muted small" style="margin-top:12px">Statements are generated from fixed wording per check and the run's own data, so the same results always read the same.
+  The next step turns these risks into plausible scenarios to test.</p>

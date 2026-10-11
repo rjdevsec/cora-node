@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block title %}{{ r.check_id }} · {{ asset.hostname }}{% endblock %}
+{% block content %}
+{% include "runs/_head.html" %}
+<div class="card" style="max-width:760px">{% include "runs/_result.html" %}</div>
+{% endblock %}

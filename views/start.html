@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}New assessment{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>New assessment</h1>
+    <p>Pick a critical business service and the applications it depends on. The tool resolves their servers and databases from the
+      asset register and extracts the evidence for each one from the loaded files.</p>
+  </div>
+</div>
+
+{% if missing|has %}
+<div class="notice warn" style="margin-bottom:16px">
+  Not ready: {{ missing|join(', ') }}. Checks that need these sources will return “no data”.
+  <a href="{{ url('data_sources') }}">Go to data sources →</a>
+</div>
+{% endif %}
+
+<div class="split">
+  <form method="post" action="{{ url('run_assessment') }}" id="assess-form">
+    {{ csrf_field() }}
+    <div class="card">
+      <div class="step-head"><span class="step-num">1</span><div><h2>Choose the critical service</h2>
+        <p>From the application dependency list</p></div></div>
+      {% if services|has %}
+      <div class="service-cards" hx-get="{{ url('service_panel') }}" hx-target="#service-panel" hx-trigger="change" hx-include="[name='service']">
+        {% for name, s in services %}
+        <label class="service-card">
+          <input type="radio" name="service" value="{{ name }}" {{ 'checked' if name == selected }}>
+          <span class="check"></span>
+          <span class="name">{{ name }}</span>
+          <span class="facts">
+            <span class="tag">Tier {{ s.tier }}</span>
+            <span class="tag">{{ ((s.tolerance_hours)|g) }}h tolerance</span>
+            <span class="tag">{{ s.applications|length }} apps</span>
+          </span>
+        </label>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="notice bad">No services found. Load an <a href="{{ url('data_sources') }}">application dependency list</a> first.</div>
+      {% endif %}
+    </div>
+
+    <div id="service-panel" style="margin-top:16px">
+      {% include "_service_panel.html" %}
+    </div>
+  </form>
+
+  <div class="stack">
+    <div class="card">
+      <h2>How a run works</h2>
+      <ol class="timeline">
+        <li>Assets from the asset register: categorisation and ownership</li>
+        <li>Patch compliance from the vulnerability scanner</li>
+        <li>Anti-malware agent status</li>
+        <li>Privileged accounts in PAM, application and database servers</li>
+        <li>Logs flowing to the SIEM</li>
+        <li>Exceptions raised for these assets</li>
+        <li>Open application and asset risks in the risk register</li>
+        <li>Backups scheduled, protected and restore-tested</li>
+        <li>Latest DR test results</li>
+        <li>Business impact of the risks found</li>
+        <li>Plausible scenarios generated from the risks, then all risks with scores</li>
+      </ol>
+    </div>
+    <div class="card">
+      <div class="card-head"><h2>Recent runs</h2><span class="spacer"></span><a class="small" href="{{ url('runs') }}">All runs</a></div>
+      {% if runs|has %}
+      <div class="run-list">
+        {% for r in runs %}
+        <a href="{{ url('run_overview', {run_id: r.id}) }}">
+          <span><strong>{{ r.service_name }}</strong><br><span class="small muted">Run #{{ r.id }} · {{ r.as_of }}</span></span>
+          <span class="spacer"></span>{% if r.mode == 'step' and (r.progress or 0) <= 11 %}<span class="badge info">Step {{ r.progress }} of 11</span>{% else %}<span class="badge {{ RATING_CLASS[r.rating] }}">{{ r.rating }}</span>{% endif %}</a>
+        {% endfor %}
+      </div>
+      {% else %}<p class="muted small">No runs yet.</p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

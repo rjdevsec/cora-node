@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}{{ run.service_name }} · {{ step.n }}. {{ step.title }}{% endblock %}
+{% block content %}
+{% include "runs/_head.html" %}
+{% set sev_class = {'Critical': 'crit', 'High': 'bad', 'Medium': 'warn', 'Low': 'info', 'Data quality': 'neutral'} %}
+
+<div class="card step-hero">
+  <div class="step-num big-num">{{ step.n }}</div>
+  <div style="flex:1;min-width:240px">
+    <div class="small muted">Step {{ step.n }} of {{ steps|length }} · {{ step.source }}</div>
+    <h2 style="margin:2px 0 4px;font-size:20px">{{ step.title }}</h2>
+    <p style="margin:0;color:var(--ink-2)">{{ step.intro }}</p>
+  </div>
+  {% if step.checks|has %}
+  <div class="pill-list">{% for c in step.checks %}<span class="tag" title="{{ CHECKS[c].name }}: fails when {{ CHECKS[c].fails_when|lower }}">{{ c }} {{ CHECKS[c].name }}</span>{% endfor %}</div>
+  {% endif %}
+</div>
+
+{% if step.checks|has %}
+{% set counted = results|where_not('status', 'n/a')|list %}
+<div class="grid cols-4" style="margin-top:16px">
+  <div class="card tight stat accent-crit"><span class="label">Risks found in this step</span><span class="value">{{ step_findings|where('result.status', 'fail')|list|length }}</span>
+    <span class="sub">{{ step_findings|where_in('severity', ['Critical', 'High'])|list|length }} critical or high</span></div>
+  <div class="card tight stat accent-good"><span class="label">Checks passed</span><span class="value">{{ counted|where('status', 'pass')|list|length }}</span><span class="sub">of {{ counted|length }} applicable</span></div>
+  <div class="card tight stat accent-warn"><span class="label">Covered by exceptions</span><span class="value">{{ counted|where('status', 'excepted')|list|length }}</span></div>
+  <div class="card tight stat accent-neutral"><span class="label">No data</span><span class="value">{{ counted|where('status', 'no_data')|list|length }}</span><span class="sub">{% if run.service_tier == 1 %}Counted as fails for Tier 1{% else %}Reported as data quality{% endif %}</span></div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>Risks identified in this step</h2><span class="spacer"></span><span class="small muted">Score = check weight × modifiers · most severe first</span></div>
+  {% if step_findings|has %}
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Severity</th><th>Asset / application</th><th>Check</th><th>Risk</th><th class="num">Score</th></tr></thead>
+    <tbody>
+    {% for f in step_findings %}{% set r = f.result %}{% set st = statements[r.id] %}
+    <tr>
+      <td><span class="badge {{ sev_class[f.severity] }}">{{ f.severity }}</span>{% if r.status == 'excepted' %}<div class="small muted" style="margin-top:4px">Excepted</div>{% endif %}</td>
+      <td>{% if f.asset|has %}<span class="mono"><strong>{{ f.subject }}</strong></span>{% else %}<strong>{{ f.subject }}</strong> <span class="tag">application</span>{% endif %}
+        <div class="small muted">{{ f.applications|join(', ') }}{% if f.owner|has %} · {{ f.owner }}{% endif %}</div></td>
+      <td class="nowrap"><a href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" hx-get="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" hx-target="#drawer">{{ r.check_id }}</a>
+        <div class="small muted">{{ CHECKS[r.check_id].name }}</div></td>
+      <td class="small">{% if st|has %}<strong>{{ st.meaning }}</strong><div class="muted" style="margin-top:4px">{{ r.detail }}</div>{% else %}{{ r.detail }}{% endif %}
+        {% if r.linked_risks|has %}<div style="margin-top:4px"><span class="tag">Recorded as {{ r.linked_risks|join(', ') }}</span></div>{% endif %}</td>
+      <td class="num"><strong>{{ ((f.effective)|g) }}</strong></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}<p class="muted" style="margin:0">No risks found in this step.</p>{% endif %}
+  {% if data_quality|has %}<p class="small muted" style="margin:10px 0 0">{{ data_quality|length }} check(s) returned no data: {% for f in data_quality %}{{ f.subject }} ({{ f.result.check_id }}){{ ', ' if not (loop.last|has) }}{% endfor %}.</p>{% endif %}
+</div>
+{% endif %}
+
+<div style="margin-top:16px">
+{% if step.key == 'assets' %}{% include "runs/steps/assets.html" %}
+{% elif step.key == 'exceptions' %}{% include "runs/steps/exceptions.html" %}
+{% elif step.key == 'risks' %}{% include "runs/steps/risks.html" %}
+{% elif step.key == 'dr' %}{% include "runs/steps/dr.html" %}
+{% elif step.key == 'impact' %}{% include "runs/steps/impact.html" %}
+{% elif step.key == 'scenarios' %}{% include "runs/steps/scenarios.html" %}
+{% else %}{% include "runs/steps/checks.html" %}{% endif %}
+</div>
+
+<div class="sticky-bar">
+  {% if step.n > 1 %}<a class="btn" href="{{ url('run_step', {run_id: run.id, n: step.n - 1}) }}">← {{ steps[step.n - 2].title }}</a>{% endif %}
+  <span class="spacer"></span>
+  <span class="small muted">{% if step.n < steps|length %}Next: {{ steps[step.n].title }}{% else %}Next: all risks with their scores{% endif %}</span>
+  <form method="post" action="{{ url('run_step_next', {run_id: run.id, n: step.n}) }}" class="inline">{{ csrf_field() }}
+    <button class="primary lg" type="submit">{% if step.n < steps|length %}Next →{% else %}View all risks →{% endif %}</button></form>
+</div>
+<aside class="drawer" id="drawer" aria-live="polite"></aside>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Map columns · {{ spec.label }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <a class="small" href="{{ url('data_sources') }}">← Data sources</a>
+    <h1>{{ spec.label }}</h1>
+    <p class="muted"><span class="mono">{{ rec.filename }}</span> · {{ rec.row_count }} rows · exported {{ rec.export_date }} ·
+      SHA-256 <span class="mono">{{ rec.sha256.slice(0, 16) }}…</span></p>
+  </div>
+</div>
+
+{% if missing|has %}<div class="notice bad" style="margin-bottom:14px">Required fields not mapped: {{ missing|pluck('label')|join(', ') }}. This source is ignored until they are.</div>
+{% else %}<div class="notice good" style="margin-bottom:14px">All required fields are mapped.</div>{% endif %}
+
+<div class="grid cols-2">
+  <form method="post" class="card">
+    {{ csrf_field() }}
+    <h2>Column mapping</h2>
+    <table>
+      <thead><tr><th>Field the tool needs</th><th>Column in your file</th></tr></thead>
+      <tbody>
+      {% for f in spec.fields %}
+      <tr>
+        <td>{{ f.label }} {% if f.required|has %}<span class="badge info">required</span>{% endif %}
+          <div class="small muted">{{ f.type }}</div></td>
+        <td><select name="map_{{ f.key }}" aria-label="Column for {{ f.label }}">
+          <option value="">— not in file —</option>
+          {% for h in rec.headers %}<option value="{{ h }}" {{ 'selected' if rec.mapping[f.key] == h }}>{{ h }}</option>{% endfor %}
+        </select></td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <div class="row" style="margin-top:12px"><button class="primary" type="submit">Save mapping</button></div>
+  </form>
+
+  <div class="card table-wrap">
+    <h2>Preview as the tool reads it</h2>
+    {% if preview|has %}
+    <table class="evidence-table">
+      <thead><tr><th>Row</th>{% for f in spec.fields %}{% if rec.mapping[f.key]|has %}<th>{{ f.label }}</th>{% endif %}{% endfor %}</tr></thead>
+      <tbody>
+      {% for r in preview %}
+      <tr><td class="muted">{{ r._row }}</td>{% for f in spec.fields %}{% if rec.mapping[f.key]|has %}
+        <td>{% set v = r[f.key]|cell %}{% if v === '' %}<span class="muted">—</span>{% else %}{{ v }}{% endif %}</td>
+      {% endif %}{% endfor %}</tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    <p class="muted small">First {{ preview|length }} rows. A blank date means the value could not be read.</p>
+    {% else %}<p class="muted">Map the required fields to see a preview.</p>{% endif %}
+  </div>
+</div>
+{% endblock %}

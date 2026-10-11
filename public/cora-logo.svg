@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="CORA">
+  <rect width="32" height="32" rx="8" fill="#2765ff"/>
+  <!-- recovery: a near-full ring with an arrowhead, the service bouncing back -->
+  <path d="M11 7.34 A10 10 0 1 0 21 7.34" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M22.2 10.8 L21 7.34 L24.6 6.7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- protection: a shield at the centre -->
+  <path d="M16 10.6 l4.4 1.6 v3.5 c0 2.8-1.8 5.1-4.4 5.9 c-2.6-.8-4.4-3.1-4.4-5.9 v-3.5 z" fill="#fff"/>
+  <path d="M14.1 16.1 l1.4 1.4 l2.6-2.8" fill="none" stroke="#2765ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

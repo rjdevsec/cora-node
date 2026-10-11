@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Rules and thresholds{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Rules and thresholds</h1>
+    <p class="muted">Starting values to calibrate with the client. Each run stores the values it used, so changing them does not alter past results.</p></div>
+</div>
+<form method="post">
+  {{ csrf_field() }}
+  <div class="grid cols-2">
+    <div class="card">
+      <h2>Check thresholds</h2>
+      <div class="fields">
+        {% for key, label in [['patch_sla_target_pct', 'P2 patch SLA target (%)'], ['discovery_max_age_days', 'T2 max days since seen'],
+                              ['av_signature_max_age_days', 'T7 max signature age (days)'], ['av_checkin_max_age_days', 'T6 max days since agent check-in'],
+                              ['siem_max_silence_hours', 'T9 max hours without events'], ['file_max_age_days', 'Upload freshness (days)'],
+                              ['excepted_weight_factor', 'Weight factor for excepted gaps'], ['material_gap_min_weight', 'Material gap minimum weight']] %}
+        <div class="field"><label for="{{ key }}">{{ label }}</label><input id="{{ key }}" type="number" step="any" name="{{ key }}" value="{{ ((settings[key])|g) }}"></div>
+        {% endfor %}
+      </div>
+      <h3>Open risks and recovery — Phase 2</h3>
+      <div class="fields">
+        <div class="field"><label for="risk_appetite">R1 risk appetite (fail above)</label>
+          <select id="risk_appetite" name="risk_appetite">{% for lvl in ['Low', 'Medium', 'High'] %}<option {{ 'selected' if settings.risk_appetite == lvl }}>{{ lvl }}</option>{% endfor %}</select></div>
+        <div class="field"><label for="dr_test_max_age_days">D1 DR test policy period (days)</label><input id="dr_test_max_age_days" type="number" step="any" name="dr_test_max_age_days" value="{{ ((settings.dr_test_max_age_days)|g) }}"></div>
+        <div class="field"><label for="thin_margin_pct">Thin recovery margin (% of tolerance)</label><input id="thin_margin_pct" type="number" step="any" name="thin_margin_pct" value="{{ ((settings.thin_margin_pct)|g) }}"></div>
+      </div>
+      <div class="field"><label for="senior_approvers">R3 senior approvers for High and Critical risk acceptance (comma separated)</label>
+        <input id="senior_approvers" type="text" name="senior_approvers" value="{{ settings.senior_approvers }}"></div>
+      <h3>Patch SLA by severity (days) — T4, P2</h3>
+      <div class="fields">{% for sev, v in settings.patch_sla_days %}
+        <div class="field"><label for="sla-{{ sev }}">{{ sev|title }}</label><input id="sla-{{ sev }}" type="number" step="any" name="patch_sla_days.{{ sev }}" value="{{ ((v)|g) }}"></div>{% endfor %}</div>
+    </div>
+    <div class="card">
+      <h2>Scoring</h2>
+      <h3>Check weights</h3>
+      <div class="fields">{% for cid, v in settings.check_weights %}
+        <div class="field"><label for="w-{{ cid }}" title="{{ CHECKS[cid].name }}">{{ cid }} {{ CHECKS[cid].name }}</label><input id="w-{{ cid }}" type="number" step="any" name="check_weights.{{ cid }}" value="{{ ((v)|g) }}"></div>{% endfor %}</div>
+      <h3>Modifiers (multipliers)</h3>
+      <div class="fields">{% for m, v in settings.modifiers %}
+        <div class="field"><label for="m-{{ m }}">{{ m|title }}</label><input id="m-{{ m }}" type="number" step="any" name="modifiers.{{ m }}" value="{{ ((v)|g) }}"></div>{% endfor %}</div>
+      <h3>Hygiene score thresholds</h3>
+      <div class="fields">{% for r, v in settings.rating_thresholds %}
+        <div class="field"><label for="r-{{ r }}">{{ r|title }} at or above</label><input id="r-{{ r }}" type="number" step="any" name="rating_thresholds.{{ r }}" value="{{ ((v)|g) }}"></div>{% endfor %}</div>
+      <p class="muted small">A scenario has a material exposure when it has a gap at or above the material weight without a valid exception or in-date risk treatment,
+        an open risk above appetite, or a hygiene score at or above the High threshold. Material exposure with untested, unproven or exceeded recovery is Critical;
+        material exposure, overdue risk treatment or unproven recovery alone is High; other gaps or a thin margin is Medium; otherwise Low.</p>
+    </div>
+  </div>
+  <div class="card row">
+    <button class="primary" type="submit">Save</button>
+    <button type="submit" name="reset" value="1">Reset to defaults</button>
+  </div>
+</form>
+{% endblock %}

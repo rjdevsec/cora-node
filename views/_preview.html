@@ -1,0 +1,28 @@
+{% if preview.app_count == 0 %}
+<p class="muted" style="margin:0">Select at least one application.</p>
+{% else %}
+<div class="grid cols-3" style="margin-bottom:14px">
+  <div class="stat"><span class="label">Applications</span><span class="value">{{ preview.app_count }}</span></div>
+  <div class="stat"><span class="label">Registered assets</span><span class="value">{{ preview.asset_count }}</span></div>
+  <div class="stat"><span class="label">Asset types</span>
+    <span class="pill-list" style="margin-top:6px">{% for t, n in preview.types %}<span class="tag">{{ n }} {{ t }}{{ 's' if n != 1 }}</span>{% endfor %}</span></div>
+</div>
+{% if preview.apps_without_assets|has %}
+<div class="notice warn small" style="margin-bottom:12px">No assets in the register for {{ preview.apps_without_assets|join(', ') }}, so the rating may be falsely low.</div>
+{% endif %}
+<table class="small">
+  <thead><tr><th>Source</th><th class="num">Rows extracted</th><th>Assets covered</th></tr></thead>
+  <tbody>
+  {% for s in preview.sources %}
+  <tr><td>{{ s.label }}</td><td class="num">{{ s.rows }}</td>
+    <td>{% if s.covered == none %}<span class="muted">—</span>{% else %}
+      <div class="row" style="gap:10px;flex-wrap:nowrap">
+        {% set total = s.of or preview.asset_count %}
+        <div class="meter" style="flex:1;min-width:70px" title="{{ s.covered }} of {{ total }} {{ s.unit or 'assets' }}"><span class="{{ 'good' if s.covered == total else 'warn' }}" style="width:{{ (100 * s.covered / total) if total|has else 0 }}%"></span></div>
+        <span class="nowrap" style="font-variant-numeric:tabular-nums">{{ s.covered }} / {{ total }}{% if s.unit|has %} {{ s.unit }}{% endif %}</span>
+      </div>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+<p class="muted small" style="margin:10px 0 0">Matched on hostname (case and domain ignored), then IP address. Unregistered hosts found by discovery are added during the run.</p>
+{% endif %}

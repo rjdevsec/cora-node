@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}{{ run.service_name }} · rating{% endblock %}
+{% block content %}
+{% include "runs/_head.html" %}
+
+<div class="card">
+  <div class="hero">
+    <div class="rating-orb {{ RATING_CLASS[run.rating] }}" role="img" aria-label="Hygiene rating {{ run.rating }}">
+      <div><strong>{{ run.rating }}</strong><span>{{ 'Service rating' if run.dr_results|has else 'Hygiene rating' }}</span></div>
+    </div>
+    <div>
+      <div class="row" style="margin-bottom:6px">
+        <span class="small muted">Weakest scenario score <strong style="color:var(--ink)">{{ ((run.score)|g) }}</strong></span>
+        {% if previous|has %}
+        {% set delta = run.score - previous.score %}
+        <span class="small muted">· vs run #{{ previous.id }} ({{ previous.rating }}, {{ ((previous.score)|g) }})</span>
+        {% if delta > 0 %}<span class="badge bad">▲ {{ ((delta|round(2))|g) }} worse</span>{% elif delta < 0 %}<span class="badge good">▼ {{ (((-delta)|round(2))|g) }} better</span>{% else %}<span class="badge neutral">No change</span>{% endif %}
+        {% endif %}
+      </div>
+      <div class="summary-lead">
+        {% for line in impact.summary.slice(0, 3) %}<p>{{ line }}</p>{% endfor %}
+      </div>
+      <div class="row" style="margin-top:4px">
+        <a class="btn primary" href="{{ url('run_all_risks', {run_id: run.id}) }}">View all risks</a>
+        <a class="btn" href="{{ url('run_step', {run_id: run.id, n: 10}) }}">Read the business impact</a>
+        <span class="small muted">{{ run.rating_reason }}</span>
+      </div>
+    </div>
+  </div>
+  {% if not (run.dr_results|has) %}
+  <div class="notice info small" style="margin-top:18px">This run rated hygiene only; it was made before open risks and DR test results were assessed. Run a new assessment for the full rating.</div>
+  {% endif %}
+</div>
+
+<div class="grid cols-4" style="margin-top:16px">
+  <div class="card tight stat accent-crit"><span class="label">Critical findings</span><span class="value">{{ severity_counts['Critical'] or 0 }}</span><span class="sub">Act immediately</span></div>
+  <div class="card tight stat accent-serious"><span class="label">High findings</span><span class="value">{{ severity_counts['High'] or 0 }}</span><span class="sub">High priority</span></div>
+  {% if run.dr_results|has %}
+  <a class="card tight stat accent-warn" href="{{ url('run_risks', {run_id: run.id}) }}" style="color:inherit"><span class="label">Open risks above appetite</span>
+    <span class="value">{{ (run.risks or [])|truthy('above')|list|length }}</span><span class="sub">of {{ (run.risks or [])|length }} open · {{ (run.unmapped_risks or [])|length }} unmapped</span></a>
+  <a class="card tight stat accent-crit" href="{{ url('run_dr', {run_id: run.id}) }}" style="color:inherit"><span class="label">Recovery not within tolerance</span>
+    <span class="value">{{ run.dr_results|where_in('recovery.status', ['exceeds', 'untested', 'unproven'])|list|length }} of {{ run.dr_results|length }}</span>
+    <span class="sub">applications exceed, untested or unproven</span></a>
+  {% else %}
+  <div class="card tight stat accent-warn"><span class="label">Excepted gaps</span><span class="value">{{ counts['excepted'] or 0 }}</span><span class="sub">Covered by a valid exception</span></div>
+  <div class="card tight stat accent-neutral"><span class="label">No data</span><span class="value">{{ counts['no_data'] or 0 }}</span><span class="sub">Data quality findings</span></div>
+  {% endif %}
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="card">
+    <div class="card-head"><h2>Scenarios against tolerance</h2><span class="spacer"></span><span class="small muted">hygiene score · recovery</span></div>
+    {% for s in scenarios %}
+    <div class="meter-row">
+      <div><strong>{{ s.name }}</strong>
+        <div class="small muted">{% if s.recovery|has %}{{ s.recovery.label|capfirst }}{% elif s.weakest_asset|has %}Weakest: <span class="mono">{{ s.weakest_asset }}</span>{% else %}No assets{% endif %}</div></div>
+      <div class="meter" title="{{ s.name }}: score {{ ((s.score)|g) }} ({{ s.rating }})"><span class="{{ RATING_CLASS[s.rating] }}" style="width:{{ (100 * s.score / scale) if scale|has else 0 }}%"></span></div>
+      <span class="num">{{ ((s.score)|g) }}</span>
+      <span class="badge {{ RATING_CLASS[s.rating] }}">{{ s.rating }}</span>
+    </div>
+    {% endfor %}
+    <p class="small muted" style="margin:10px 0 0">Bars show the hygiene score of the weakest asset (scaled to the Critical threshold of {{ ((run.settings.rating_thresholds.critical)|g) }} or the highest score).
+      {% if run.dr_results|has %}The rating combines it with open risks and the recovery demonstrated in DR tests.{% endif %}</p>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Weakest assets</h2><span class="spacer"></span><a class="small" href="{{ url('run_matrix', {run_id: run.id}) }}">Hygiene matrix →</a></div>
+    <table>
+      <thead><tr><th>Asset</th><th>Modifiers</th><th class="num">Score</th></tr></thead>
+      <tbody>
+      {% for a in top_assets %}
+      <tr><td><span class="mono"><strong>{{ a.hostname }}</strong></span>{% if not (a.registered|has) %} <span class="badge bad">Unregistered</span>{% endif %}
+          <div class="small muted">{{ a.asset_type }} · {{ (a.applications if a.applications|has else a.subnet_applications)|join(', ') }}</div></td>
+        <td><div class="pill-list">{% for m in a.modifiers %}<span class="tag">{{ m }}</span>{% else %}<span class="muted small">—</span>{% endfor %}</div></td>
+        <td class="num"><strong>{{ ((a.score)|g) }}</strong></td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="grid cols-2" style="margin-top:16px">
+  <div class="card table-wrap">
+    <h2>Results by check</h2>
+    <table class="small">
+      <thead><tr><th>Check</th><th class="num">Pass</th><th class="num">Fail</th><th class="num">Excepted</th><th class="num">No data</th></tr></thead>
+      <tbody>
+      {% for cid, c in by_check %}
+      <tr><td><span class="tag">{{ cid }}</span> {{ CHECKS[cid].name }}</td>
+        <td class="num">{{ c['pass'] or 0 }}</td>
+        <td class="num">{% if c['fail']|has %}<span class="badge bad">{{ c.fail }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
+        <td class="num">{% if c['excepted']|has %}<span class="badge warn">{{ c.excepted }}</span>{% else %}<span class="muted">0</span>{% endif %}</td>
+        <td class="num">{% if c['no_data']|has %}<span class="badge neutral">{{ c.no_data }}</span>{% else %}<span class="muted">0</span>{% endif %}</td></tr>
+      {% endfor %}
+      {% set p2 = run.service_checks.P2 %}
+      <tr><td><span class="tag">P2</span> Service-wide patch SLA adherence</td>
+        <td colspan="4" class="num">{% if p2.pct != none %}<span class="badge {{ STATUS_CLASS[p2.status] }}">{{ p2.pct }}%</span> of {{ p2.total }} vs target {{ p2.target }}%{% else %}no data{% endif %}</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div>
+    <div class="card">
+      <h2>Applications</h2>
+      <table class="small">
+        <thead><tr><th>Application</th><th class="num">Assets</th><th>Owner (H1)</th></tr></thead>
+        <tbody>
+        {% for a in run.app_results %}
+        <tr><td><strong>{{ a.name }}</strong><div class="mono muted">{{ a.id }}</div></td>
+          <td class="num">{% if a.asset_count|has %}{{ a.asset_count }}{% else %}<span class="badge bad">0</span>{% endif %}</td>
+          <td><span class="badge {{ STATUS_CLASS[a.status] }}">{{ STATUS_LABELS[a.status] }}</span> <span class="muted">{{ a.detail }}</span></td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card table-wrap">
+      <h2>Evidence used</h2>
+      <table class="small">
+        <thead><tr><th>Source</th><th>File</th><th class="num">Rows</th><th class="num">Covered</th></tr></thead>
+        <tbody>
+        {% for s in run.sources %}
+        <tr><td>{{ s.label }}</td>
+          <td>{% if s.filename|has %}<span class="mono" title="SHA-256 {{ s.sha256 }}">{{ s.filename }}</span>
+              <div class="muted">exported {{ s.export_date }}{% if s.stale|has %} <span class="badge warn">Stale · {{ s.age_days }}d</span>{% endif %}</div>
+            {% else %}<span class="badge neutral">Not loaded</span>{% endif %}</td>
+          <td class="num">{{ s.rows }}</td>
+          <td class="num">{% if s.covered != none %}{{ s.covered }} / {{ s.asset_total }}{% else %}—{% endif %}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

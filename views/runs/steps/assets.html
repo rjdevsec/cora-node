@@ -1,0 +1,63 @@
+{% set rec = run.reconciliation %}
+
+<div class="grid cols-4">
+  <div class="card tight stat"><span class="label">Registered assets in scope</span><span class="value">{{ rec.registered_in_scope }}</span></div>
+  <div class="card tight stat"><span class="label">Matched to discovery</span><span class="value">{{ rec.matched }}</span></div>
+  <div class="card tight stat"><span class="label">Registered, not seen{% if rec.stale|has %} ({{ rec.stale }} stale){% endif %}</span><span class="value">{{ rec.not_seen + rec.stale }}</span></div>
+  <div class="card tight stat"><span class="label">Discovered, not registered</span><span class="value">{{ rec.unregistered }}</span></div>
+</div>
+{% if not (rec.discovery_loaded|has) %}<div class="notice warn" style="margin-top:14px">No discovery scan was loaded, so reconciliation was not possible.</div>{% endif %}
+{% if rec.apps_without_assets|has %}<div class="notice bad" style="margin-top:14px">No assets in the register for {{ rec.apps_without_assets|join(', ') }}. Assets are probably missing, so the rating may be falsely low.</div>{% endif %}
+
+<div class="card table-wrap" style="margin-top:14px">
+  <h2>Resolved assets</h2>
+  <table>
+    <thead><tr><th>Asset</th><th>Type</th><th>Applications</th><th>Owner</th><th>Platform</th><th>Discovery</th><th>Categorisation (T3)</th><th>Ownership (H1)</th><th>Also supports</th></tr></thead>
+    <tbody>
+    {% for a in run.assets %}
+    {% set t3 = t3[a.id] %}{% set h1 = grid[a.id]['H1'] %}
+    <tr>
+      <td><span class="mono">{{ a.hostname }}</span>{% if a.internet_facing|has %} <span class="badge warn">internet-facing</span>{% endif %}
+        <div class="small muted">{{ a.asset_id or 'no asset ID' }} · {{ a.ip or 'no IP' }}</div></td>
+      <td>{{ a.asset_type }}</td>
+      <td class="small">{% if a.applications|has %}{{ a.applications|join(', ') }}{% else %}<span class="muted">subnet of {{ a.subnet_applications|join(', ') }}</span>{% endif %}</td>
+      <td class="small">{{ a.owner or '—' }}</td>
+      <td class="small">{{ a.os or '—' }}</td>
+      <td>{% if a.discovery_status == 'matched' %}<span class="badge good">Seen</span> <span class="small muted">by {{ a.discovery_match_key }}</span>
+        {% elif a.discovery_status == 'stale' %}<span class="badge warn">Seen, stale</span>
+        {% elif a.discovery_status == 'not_seen' %}<span class="badge bad">Not seen</span>
+        {% elif a.discovery_status == 'unregistered' %}<span class="badge bad">Not registered</span>
+        {% else %}<span class="badge neutral">No data</span>{% endif %}</td>
+      <td class="small"><span class="badge {{ STATUS_CLASS[t3.status] }}">{{ STATUS_LABELS[t3.status] }}</span> {{ a.criticality or '' }}</td>
+      <td class="small">{% if h1|has %}<span class="badge {{ STATUS_CLASS[h1.status] }}" title="{{ h1.detail }}">{{ STATUS_LABELS[h1.status] }}</span>{% endif %}</td>
+      <td class="small">{{ a.other_services|join(', ') or '—' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card table-wrap">
+  <h2>Application ownership (H1)</h2>
+  <table class="small">
+    <thead><tr><th>Application</th><th class="num">Assets</th><th>Owner</th></tr></thead>
+    <tbody>
+    {% for a in run.app_results %}
+    <tr><td><strong>{{ a.name }}</strong> <span class="mono muted">{{ a.id }}</span></td>
+      <td class="num">{% if a.asset_count|has %}{{ a.asset_count }}{% else %}<span class="badge bad">0</span>{% endif %}</td>
+      <td><span class="badge {{ STATUS_CLASS[a.status] }}">{{ STATUS_LABELS[a.status] }}</span> <span class="muted">{{ a.detail }}</span></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card table-wrap">
+  <h2>Review queue <span class="muted small">— source rows that match no asset in the register</span></h2>
+  {% if run.unmatched|has %}
+  <table class="small">
+    <thead><tr><th>Source</th><th>Row</th><th>Host</th><th>Reason</th></tr></thead>
+    <tbody>{% for u in run.unmatched %}<tr><td>{{ u.source_label }}</td><td>{{ u.row }}</td><td class="mono">{{ u.host }}</td><td>{{ u.reason }}</td></tr>{% endfor %}</tbody>
+  </table>
+  <p class="muted small">These rows are kept, not dropped. They may belong to unregistered assets or use a different hostname than the register.</p>
+  {% else %}<p class="muted">Every source row matched an asset in the register.</p>{% endif %}
+</div>

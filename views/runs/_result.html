@@ -1,0 +1,38 @@
+<div class="drawer-head"><span class="small muted">Evidence</span><span class="spacer"></span>
+  <button type="button" class="small" data-close-drawer aria-label="Close evidence panel">Close ✕</button></div>
+{% set c = CHECKS[r.check_id] %}
+<div class="row"><h2 style="margin:0">{{ r.check_id }} · {{ c.name }}</h2><span class="spacer"></span>
+  <span class="badge {{ STATUS_CLASS[r.status] }}">{{ STATUS_LABELS[r.status] }}</span></div>
+<p class="small muted" style="margin:4px 0 10px">{{ c.perspective }} · fails when {{ c.fails_when|lower }}</p>
+<dl class="kv">
+  {% if asset|has %}
+  <dt>Asset</dt><dd><span class="mono">{{ asset.hostname }}</span> {{ asset.asset_id }}</dd>
+  <dt>Applications</dt><dd>{{ (asset.applications if asset.applications|has else asset.subnet_applications)|join(', ') or '—' }}</dd>
+  {% else %}
+  <dt>Application</dt><dd>{{ app.name if app|has else r.application_id }} <span class="mono muted">{{ r.application_id }}</span></dd>
+  {% endif %}
+  <dt>Result</dt><dd>{{ r.detail }}</dd>
+  {% if r.raw_status != r.status %}<dt>Before exceptions</dt><dd>{{ STATUS_LABELS[r.raw_status] }}</dd>{% endif %}
+  {% if asset|has %}<dt>Score weight</dt><dd>{{ ((r.weight)|g) }}{% if (asset.modifiers|has) and r.weight %} × {{ asset.modifiers|join(', ') }}{% endif %}</dd>{% endif %}
+  {% if r.linked_risks|has %}<dt>Recorded as risk</dt><dd>{{ r.linked_risks|join(', ') }}</dd>{% endif %}
+</dl>
+{% if r.exception|has %}
+<h3 style="margin-top:14px">Exception {{ r.exception['values'].exception_id }}
+  {% if r.exception.valid|has %}<span class="badge good">valid</span>{% else %}<span class="badge bad">not valid</span>{% endif %}</h3>
+<dl class="kv small">
+  <dt>Reason</dt><dd>{{ r.exception['values'].reason or '—' }}</dd>
+  <dt>Compensating</dt><dd>{{ r.exception['values'].compensating_control or '—' }}</dd>
+  <dt>Approver</dt><dd>{{ r.exception['values'].approver or '—' }}</dd>
+  <dt>Expiry</dt><dd>{{ r.exception['values'].expiry or '—' }}</dd>
+  {% if r.exception.problems|has %}<dt>Problems</dt><dd>{{ r.exception.problems|join(', ') }}</dd>{% endif %}
+</dl>
+{% endif %}
+<h3 style="margin-top:14px">Source rows ({{ r.evidence|length }})</h3>
+{% for ev in r.evidence %}
+<details {{ 'open' if loop.index <= 3 }} style="margin-bottom:6px">
+  <summary class="small">{{ ev.source_label }} · row {{ ev.row }}</summary>
+  <table class="evidence-table">{% for k, v in ev['values'] %}{% if v !== '' %}<tr><th>{{ k }}</th><td>{{ v }}</td></tr>{% endif %}{% endfor %}</table>
+</details>
+{% else %}
+<p class="muted small">No source rows — the result comes from the absence of a record.</p>
+{% endfor %}

@@ -1,0 +1,87 @@
+{% if run.risks == none %}
+<div class="notice info">This run was made before open risks were assessed. Run a new assessment to see them.</div>
+{% else %}
+{% set above = risks|truthy('above')|list %}
+{% set late_count = (risks|truthy('overdue')|length) + (risks|truthy('no_owner')|where('overdue', false)|length) %}
+{% set bad_acc = risks|truthy('acceptance_problems')|list %}
+<div class="grid cols-4">
+  <div class="card tight stat accent-info"><span class="label">Open risks in scope</span><span class="value">{{ risks|length }}</span><span class="sub">{{ risks|where('category', 'Application')|list|length }} application security · {{ risks|where('category', 'Asset')|list|length }} asset</span></div>
+  <div class="card tight stat accent-crit"><span class="label">Above {{ run.settings.risk_appetite }} appetite</span><span class="value">{{ above|length }}</span><span class="sub">R1</span></div>
+  <div class="card tight stat accent-serious"><span class="label">Overdue or unowned</span><span class="value">{{ late_count }}</span><span class="sub">R2 · invalid acceptance (R3): {{ bad_acc|length }}</span></div>
+  <div class="card tight stat accent-warn"><span class="label">Systems with unrecorded gaps</span><span class="value">{{ unrecorded|length }}</span><span class="sub">R4 · failed checks with no risk or exception</span></div>
+</div>
+
+<div class="card table-wrap" style="margin-top:16px">
+  <div class="card-head"><h2>Risk position by application</h2></div>
+  <table>
+    <thead><tr><th>Application</th>{% for c in ['R1', 'R2', 'R3'] %}<th>{{ c }} · {{ CHECKS[c].name }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for a in run.applications %}
+    <tr><td><strong>{{ a.name }}</strong><div class="mono muted small">{{ a.id }}</div></td>
+      {% for c in ['R1', 'R2', 'R3'] %}{% set r = app_results[a.id ~ '|' ~ c] %}
+      <td class="small">{% if r|has %}<a href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" class="badge {{ STATUS_CLASS[r.status] }}">{{ STATUS_LABELS[r.status] }}</a>
+        <div class="muted" style="margin-top:4px">{{ r.detail }}</div>{% else %}—{% endif %}</td>
+      {% endfor %}</tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="card table-wrap">
+  <div class="card-head"><h2>Open risks for the in-scope applications</h2><span class="spacer"></span><span class="small muted">Every open risk is listed; the appetite decides which fail R1</span></div>
+  {% if risks|has %}
+  <table>
+    <thead><tr><th>Risk</th><th>Label</th><th>Rating</th><th>Applications · assets</th><th>Status</th><th>Owner</th><th>Treatment due</th><th>Acceptance</th></tr></thead>
+    <tbody>
+    {% for r in risks %}
+    <tr>
+      <td><span class="mono">{{ r.id }}</span><div><strong>{{ r.title }}</strong></div>
+        {% if r.treatment|has %}<div class="small muted">{{ r.treatment }}</div>{% endif %}
+        {% if r.controls|has %}<div class="pill-list" style="margin-top:4px">{% for c in r.controls %}<span class="tag">{{ c }}</span>{% endfor %}</div>{% endif %}</td>
+      <td><span class="tag">{{ r.category or '—' }}</span></td>
+      <td><span class="badge {{ ({'Critical': 'crit', 'High': 'bad', 'Medium': 'warn', 'Low': 'good'})[r.rating] or 'neutral' }}">{{ r.rating }}</span>
+        {% if r.above|has %}<div class="small" style="margin-top:4px;color:var(--critical-ink)">Above appetite</div>{% endif %}</td>
+      <td class="small">{% for x in r.apps %}{{ app_names[x] or x }}{{ ', ' if not (loop.last|has) }}{% endfor %}{% if r.hosts|has %}<div class="mono muted">{{ r.hosts|join(', ') }}</div>{% endif %}</td>
+      <td class="small">{{ r.status }}</td>
+      <td class="small">{% if r.no_owner|has %}<span class="badge bad">No owner</span>{% else %}{{ r.owner }}{% endif %}</td>
+      <td class="small nowrap">{{ r.due_date or '—' }}{% if r.overdue|has %}<br><span class="badge bad">Overdue</span>{% endif %}</td>
+      <td class="small">{% if r.accepted|has %}{{ r.approver or 'No approver' }}{% if r.review_date|has %}<div class="muted">review {{ r.review_date }}</div>{% endif %}
+        {% if r.acceptance_problems|has %}<div style="color:var(--critical-ink)">{{ r.acceptance_problems|join('; ') }}</div>{% endif %}{% else %}<span class="muted">—</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No open risks are recorded against the in-scope applications or their assets.</p>{% endif %}
+</div>
+
+<div class="card table-wrap">
+  <div class="card-head"><h2>Gaps with no recorded risk (R4)</h2><span class="spacer"></span><span class="small muted">Unrecorded risks score at full weight</span></div>
+  {% if unrecorded|has %}
+  <table>
+    <thead><tr><th>Asset</th><th>Applications</th><th>Unrecorded gaps</th><th>Owner</th></tr></thead>
+    <tbody>
+    {% for r in unrecorded %}
+    <tr><td class="mono"><a href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}">{{ r.asset.hostname }}</a></td>
+      <td class="small">{{ (r.asset.applications if r.asset.applications|has else r.asset.subnet_applications)|join(', ') }}</td>
+      <td><div class="pill-list">{% for c in (r.extra.unrecorded if r.extra|has else []) %}<span class="tag" title="{{ CHECKS[c].name if c in CHECKS else '' }}">{{ c }}</span>{% endfor %}</div></td>
+      <td class="small">{{ r.asset.owner or '—' }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">Every failed check is recorded as a risk or covered by an exception.</p>{% endif %}
+  <p class="muted small">A gap counts as recorded when an open risk is linked to the asset or its application and names the check under “related checks”,
+    or is linked to the asset directly without naming checks.</p>
+</div>
+
+<div class="card table-wrap">
+  <div class="card-head"><h2>Review queue · unmapped risks</h2><span class="spacer"></span><span class="small muted">Open risks that match no known application or asset</span></div>
+  {% if unmapped|has %}
+  <table class="small">
+    <thead><tr><th>Risk</th><th>Rating</th><th>Applications given</th><th>Assets given</th><th>Reason</th></tr></thead>
+    <tbody>{% for u in unmapped %}<tr><td><span class="mono">{{ u.id }}</span> {{ u.title }}</td><td>{{ u.rating }}</td><td>{{ u.applications }}</td>
+      <td class="mono">{{ u.assets }}</td><td class="muted">{{ u.reason }}</td></tr>{% endfor %}</tbody>
+  </table>
+  <p class="muted small">These may belong to an in-scope application under a different name. Phase 3 adds AI-suggested mapping for the analyst to confirm.</p>
+  {% else %}<p class="muted">Every open risk maps to a known application or asset.</p>{% endif %}
+</div>
+{% endif %}

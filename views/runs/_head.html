@@ -1,0 +1,38 @@
+{% set stepping = (run.mode or 'full') == 'step' %}
+{% set progress = run.progress or 99 %}
+{% set is_complete = not stepping or progress > 11 %}
+<div class="run-head">
+  <div>
+    <div class="crumb"><a href="{{ url('runs') }}">Assessment runs</a><span>/</span><span>Run #{{ run.id }}</span></div>
+    <h1>{{ run.service_name }}
+      {% if is_complete|has %}<span class="badge {{ RATING_CLASS[run.rating] }}">{{ run.rating }}</span>
+      {% else %}<span class="badge info">In progress · step {{ progress }} of 11</span>{% endif %}</h1>
+    <div class="run-meta">
+      <span class="tag">As of {{ run.as_of }}</span>
+      <span class="tag">Tier {{ run.service_tier }}</span>
+      <span class="tag">{{ ((run.impact_tolerance_hours)|g) }}h impact tolerance</span>
+      <span class="tag">{{ run.applications|length }} applications</span>
+      <span class="tag">{{ run.assets|length }} assets</span>
+      <span class="tag">{{ 'Step by step' if stepping|has else 'Full run' }}</span>
+    </div>
+  </div>
+  {% if is_complete|has %}
+  <a class="btn" href="{{ url('findings_csv', {run_id: run.id}) }}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+    Export risks</a>
+  {% endif %}
+</div>
+<nav class="step-nav" aria-label="Assessment steps">
+  {% for s in [['1', 'Assets'], ['2', 'Patching'], ['3', 'Anti-malware'], ['4', 'PAM'], ['5', 'SIEM'], ['6', 'Exceptions'], ['7', 'Open risks'],
+               ['8', 'Backups'], ['9', 'DR tests'], ['10', 'Impact'], ['11', 'Scenarios']] %}
+  {% set n = s[0]|int %}
+  {% set state = 'current' if tab == 'step' ~ n else ('locked' if stepping and n > progress else 'done') %}
+  {% if state == 'locked' %}<span class="step-pill locked" title="Complete the earlier steps first"><b>{{ n }}</b>{{ s[1] }}</span>
+  {% else %}<a class="step-pill {{ state }}" href="{{ url('run_step', {run_id: run.id, n: n}) }}"><b>{{ n }}</b>{{ s[1] }}</a>{% endif %}
+  {% endfor %}
+  <span class="step-sep"></span>
+  {% for key, label, endpoint in [['overview', 'Summary', 'run_overview'], ['all', 'All risks', 'run_all_risks'], ['matrix', 'Matrix', 'run_matrix']] %}
+  {% if is_complete|has %}<a class="step-pill summary {{ 'current' if tab == key }}" href="{{ url(endpoint, {run_id: run.id}) }}">{{ label }}</a>
+  {% else %}<span class="step-pill summary locked" title="Opens after step 11">{{ label }}</span>{% endif %}
+  {% endfor %}
+</nav>

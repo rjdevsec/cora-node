@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}{{ run.service_name }} · hygiene matrix{% endblock %}
+{% block content %}
+{% include "runs/_head.html" %}
+<div class="card table-wrap">
+  <div class="row" style="margin-bottom:12px">
+    <h2 style="margin:0">Hygiene matrix</h2><span class="spacer"></span>
+    <span class="legend"><span><span class="sw good">✓</span>Pass</span><span><span class="sw bad">✗</span>Fail</span>
+      <span><span class="sw warn">E</span>Excepted</span><span><span class="sw neutral">?</span>No data</span><span><span class="sw">·</span>N/A</span></span>
+  </div>
+  <table class="matrix">
+    <thead><tr><th>Asset</th>{% for cid in ASSET_CHECKS %}<th class="chk" title="{{ CHECKS[cid].name }}: fails when {{ CHECKS[cid].fails_when|lower }}">{{ cid }}</th>{% endfor %}<th class="num">Score</th></tr></thead>
+    <tbody>
+    {% for a in assets %}
+    <tr>
+      <td class="host"><span class="mono"><strong>{{ a.hostname }}</strong></span>
+        <div class="small muted">{% if not (a.registered|has) %}<span class="badge bad">Unregistered</span> {% endif %}{{ (a.applications if a.applications|has else a.subnet_applications)|join(', ') }}</div></td>
+      {% for cid in ASSET_CHECKS %}
+      {% set r = grid[a.id][cid] %}
+      {% if not (r|has) %}<td class="cell na">·</td>{% else %}
+      <td class="cell {{ STATUS_CLASS[r.status] }}"><a href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}"
+          hx-get="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" hx-target="#drawer"
+          title="{{ cid }} {{ STATUS_LABELS[r.status] }}: {{ r.detail }}">{{ {'pass': '✓', 'fail': '✗', 'excepted': 'E', 'no_data': '?', 'n/a': '·'}[r.status] }}</a></td>{% endif %}
+      {% endfor %}
+      <td class="num score" title="{{ ('Modifiers: ' ~ a.modifiers|join(', ')) if a.modifiers|has else 'No modifiers' }}"><strong>{{ ((a.score)|g) }}</strong></td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="small muted" style="margin-top:10px">Select any cell to open the check result, the rule applied and the source rows behind it. Hover a column heading for the rule.</p>
+<aside class="drawer" id="drawer" aria-live="polite"></aside>
+{% endblock %}

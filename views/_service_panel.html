@@ -1,0 +1,58 @@
+{% if svc|has %}
+<div class="card">
+  <div class="step-head"><span class="step-num">2</span><div><h2>Service definition</h2>
+    <p>From the dependency list; changes apply to this run only</p></div></div>
+  <div class="fields">
+    <div class="field"><label for="tier">Service tier</label>
+      <select id="tier" name="tier">{% for t in (1, 2, 3) %}<option value="{{ t }}" {{ 'selected' if t == svc.tier }}>Tier {{ t }}</option>{% endfor %}</select></div>
+    <div class="field"><label for="tolerance">Impact tolerance (hours)</label>
+      <input id="tolerance" type="number" step="0.5" min="0" name="tolerance" value="{{ ((svc.tolerance_hours)|g) }}"></div>
+    <div class="field"><label for="as_of">Assess as of</label>
+      <input id="as_of" type="date" name="as_of" value="{{ today }}"></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="step-head"><span class="step-num">3</span><div><h2>Dependent applications</h2>
+    <p>Untick any that are out of scope, or add others</p></div></div>
+  <div hx-post="{{ url('preview') }}" hx-trigger="change" hx-target="#preview" hx-include="[name='apps']">
+    <div class="app-pick">
+      {% for a in svc.applications %}
+      <label><input type="checkbox" name="apps" value="{{ a.id }}" checked>
+        <span><strong>{{ a.name }}</strong><br><span class="id">{{ a.id }}</span>
+          <span class="small muted">· {{ a.owner or 'no owner' }}</span></span></label>
+      {% endfor %}
+    </div>
+    {% if other_apps|has %}
+    <details style="margin-top:14px">
+      <summary class="small">Add another application ({{ other_apps|length }} more known)</summary>
+      <div class="app-pick" style="margin-top:10px">
+        {% for a in other_apps %}
+        <label><input type="checkbox" name="apps" value="{{ a.id }}">
+          <span><strong>{{ a.name }}</strong><br><span class="id">{{ a.id }}</span></span></label>
+        {% endfor %}
+      </div>
+    </details>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="step-head"><span class="step-num">4</span><div><h2>What will be extracted</h2>
+    <p>Updates as you change the applications</p></div></div>
+  <div id="preview">{% include "_preview.html" %}</div>
+</div>
+
+<div class="sticky-bar">
+  <div><strong>{{ svc.name }}</strong><div class="small muted">Plausible scenarios are generated from the risks found. Each run is a dated snapshot.</div></div>
+  <span class="spacer"></span>
+  <button type="submit" name="mode" value="full">Run full assessment</button>
+  <button class="primary lg" type="submit" name="mode" value="step">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l14 8-14 8V4z"/></svg>
+    Run step by step</button>
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:40px 20px">
+  <p class="muted" style="margin:0">Choose a service above to see its applications and the evidence that will be extracted.</p>
+</div>
+{% endif %}

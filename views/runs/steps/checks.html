@@ -1,0 +1,30 @@
+{# Results by asset for a step that checks one source (patching, anti-malware, PAM, SIEM, backups). #}
+{% set groups = [['Application servers', assets|where('asset_type', 'Server')|list],
+                 ['Database servers', assets|where('asset_type', 'Database')|list],
+                 ['Other and unregistered', assets|where_not_in('asset_type', ['Server', 'Database'])|list]]
+   if step.key == 'pam' else [['All assets', assets]] %}
+{% set any_results = results|where_not('status', 'n/a')|list %}
+{% if not (any_results|has) %}
+<div class="notice info">This step was not assessed in this run{% if step.key == 'backups' %} (backups were added to the assessment later){% endif %}.</div>
+{% else %}
+{% for item in groups %}{% set label = item[0] %}{% set group = item[1] %}{% if group.length|has %}
+<div class="card table-wrap">
+  <div class="card-head"><h2>{{ label if step.key == 'pam' else 'Results by asset' }}</h2><span class="spacer"></span><span class="small muted">{{ group|length }} asset{{ 's' if group|length != 1 }}</span></div>
+  <table>
+    <thead><tr><th style="width:22%">Asset</th>{% for c in step.checks %}<th>{{ c }} · {{ CHECKS[c].name }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for a in group %}
+    <tr><td><span class="mono"><strong>{{ a.hostname }}</strong></span>
+        <div class="small muted">{% if not (a.registered|has) %}<span class="badge bad">Unregistered</span> {% endif %}{{ a.asset_type }} · {{ (a.applications if a.applications|has else a.subnet_applications)|join(', ') }}</div></td>
+      {% for c in step.checks %}{% set r = grid[a.id][c] %}
+      <td class="small">{% if r|has %}<a class="badge {{ STATUS_CLASS[r.status] }}" href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}"
+          hx-get="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" hx-target="#drawer">{{ STATUS_LABELS[r.status] }}</a>
+        <div class="muted" style="margin-top:4px">{{ r.detail }}</div>{% else %}<span class="muted">—</span>{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}{% endfor %}
+{% endif %}

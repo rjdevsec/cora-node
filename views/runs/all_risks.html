@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}{{ run.service_name }} · all risks{% endblock %}
+{% block content %}
+{% include "runs/_head.html" %}
+{% set sev_class = {'Critical': 'crit', 'High': 'bad', 'Medium': 'warn', 'Low': 'info', 'Data quality': 'neutral'} %}
+
+<div class="card">
+  <div class="hero">
+    <div class="rating-orb {{ RATING_CLASS[run.rating] }}" role="img" aria-label="Service rating {{ run.rating }}">
+      <div><strong>{{ run.rating }}</strong><span>Service rating</span></div>
+    </div>
+    <div>
+      <h2 style="margin:0 0 6px">All risks identified</h2>
+      <p style="margin:0 0 8px">{{ run.rating_reason }}</p>
+      <div class="row">
+        <a class="btn primary" href="{{ url('run_step', {run_id: run.id, n: 11}) }}">Plausible scenarios ({{ run.scenario_results|length }})</a>
+        <a class="btn" href="{{ url('run_overview', {run_id: run.id}) }}">Summary</a>
+        <a class="btn" href="{{ url('findings_csv', {run_id: run.id}) }}">Export as CSV</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="grid cols-4" style="margin-top:16px">
+  {% for sev, accent in [['Critical', 'crit'], ['High', 'serious'], ['Medium', 'warn'], ['Low', 'info']] %}
+  <div class="card tight stat accent-{{ accent }}"><span class="label">{{ sev }}</span><span class="value">{{ severity_counts[sev] or 0 }}</span>
+    <span class="sub">{{ {'Critical': 'Act immediately', 'High': 'High priority', 'Medium': 'Plan the fix', 'Low': 'Excepted or minor'}[sev] }}</span></div>
+  {% endfor %}
+</div>
+
+<div class="card table-wrap" style="margin-top:16px">
+  <div class="card-head"><h2>Risk register for this assessment</h2><span class="spacer"></span>
+    <span class="small muted">{{ findings|length }} entries · score = check weight × modifiers (exposure, exploitability, concentration, compounding)</span></div>
+  <table>
+    <thead><tr><th>#</th><th>Severity</th><th class="num">Score</th><th>Asset / application</th><th>Check · step</th><th style="min-width:380px">Risk</th><th>Scenarios</th><th>Owner</th></tr></thead>
+    <tbody>
+    {% for f in findings %}{% set r = f.result %}{% set st = statements[r.id] %}{% set s = step_of[r.check_id] %}
+    <tr>
+      <td class="muted small">{{ loop.index }}</td>
+      <td><span class="badge {{ sev_class[f.severity] }}">{{ f.severity }}</span>{% if r.status == 'excepted' %}<div class="small muted" style="margin-top:4px">Excepted</div>{% endif %}</td>
+      <td class="num"><strong>{{ ((f.effective)|g) }}</strong></td>
+      <td>{% if f.asset|has %}<span class="mono"><strong>{{ f.subject }}</strong></span>{% else %}<strong>{{ f.subject }}</strong> <span class="tag">application</span>{% endif %}
+        <div class="small muted">{{ f.applications|join(', ') }}</div></td>
+      <td class="nowrap"><a href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" hx-get="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" hx-target="#drawer">{{ r.check_id }}</a>
+        <div class="small muted">{{ CHECKS[r.check_id].name }}</div>
+        {% if s|has %}<div class="small"><a class="muted" href="{{ url('run_step', {run_id: run.id, n: s.n}) }}">Step {{ s.n }} · {{ s.title }}</a></div>{% endif %}</td>
+      <td class="small">{% if st|has %}{{ st.meaning }}{% else %}{{ r.detail }}{% endif %}
+        {% if r.linked_risks|has %}<div style="margin-top:4px"><span class="tag">Recorded as {{ r.linked_risks|join(', ') }}</span></div>{% endif %}</td>
+      <td class="small">{% if st and (st.scenarios|has) %}<a href="{{ url('run_step', {run_id: run.id, n: 11}) }}" title="{{ st.scenarios|join(' · ') }}">{{ st.scenarios|length }}</a>{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="small">{{ f.owner or '—' }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<aside class="drawer" id="drawer" aria-live="polite"></aside>
+{% endblock %}

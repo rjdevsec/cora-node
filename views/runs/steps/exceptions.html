@@ -1,0 +1,30 @@
+<div class="card table-wrap">
+  <h2>Exceptions matched to gaps</h2>
+  {% if applied|has %}
+  <table>
+    <thead><tr><th>Exception</th><th>Asset</th><th>Check</th><th>Gap</th><th>Compensating control</th><th>Approver</th><th>Expiry</th><th>Outcome</th></tr></thead>
+    <tbody>
+    {% for r in applied %}{% set e = r.exception %}
+    <tr><td class="mono">{{ e['values'].exception_id or '—' }}</td><td class="mono">{{ r.asset.hostname }}</td>
+      <td><a href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}">{{ r.check_id }}</a></td>
+      <td class="small">{{ r.detail }}</td><td class="small">{{ e['values'].compensating_control or '—' }}</td>
+      <td class="small">{{ e['values'].approver or '—' }}</td><td class="small nowrap">{{ e['values'].expiry or '—' }}</td>
+      <td>{% if e.valid|has %}<span class="badge warn">Excepted</span>{% else %}<span class="badge bad">Still a gap</span><div class="small muted">{{ e.problems|join(', ') }}</div>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No failed check on an in-scope asset has a matching exception.</p>{% endif %}
+</div>
+
+<div class="card table-wrap">
+  <h2>Exception validity (P1)</h2>
+  {% if p1|has %}
+  <table>
+    <thead><tr><th>Asset</th><th>Result</th><th>Detail</th></tr></thead>
+    <tbody>{% for r in p1 %}<tr><td class="mono">{{ r.asset.hostname }}</td>
+      <td><span class="badge {{ STATUS_CLASS[r.status] }}">{{ STATUS_LABELS[r.status] }}</span></td><td class="small">{{ r.detail }}</td></tr>{% endfor %}</tbody>
+  </table>
+  {% else %}<p class="muted">No exceptions are recorded against in-scope assets.</p>{% endif %}
+  <p class="muted small">A valid exception needs an approver, a compensating control and an expiry date on or after {{ run.as_of }}. An excepted gap still counts toward the score at
+    {{ ((run.settings.excepted_weight_factor * 100)|g) }}% of its weight.</p>
+</div>

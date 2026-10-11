@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Data sources{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Data sources</h1>
+    <p class="muted">The latest file for each source feeds new runs. Each upload goes through column mapping, so the client's export
+      format does not have to match a template. Earlier runs keep a reference (name and SHA-256) to the files they used.</p>
+  </div>
+  {% if sample_reset %}<form method="post" action="{{ url('reset_samples') }}">{{ csrf_field() }}
+    <button type="submit" title="Regenerates the synthetic cash withdrawal data set dated today">Reload synthetic data</button></form>{% endif %}
+</div>
+
+{# CONNECTOR (Phase 5): every source is a manual CSV upload today. A connector-backed source would show its
+   last successful pull, its schedule and a "Pull now" button in place of the upload form, and skip mapping. #}
+<div class="card table-wrap">
+<table>
+  <thead><tr><th>Source</th><th>Used by</th><th>Active file</th><th class="num">Rows</th><th>Export date</th><th>Mapping</th><th>Upload a new file</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+  {% set spec = row.spec %}{% set rec = row.rec %}
+  <tr>
+    <td><strong>{{ spec.label }}</strong><div class="small muted">{{ spec.description }}</div></td>
+    <td class="small nowrap">{{ spec.used_by }}</td>
+    <td class="small">{% if rec|has %}<span class="mono">{{ rec.filename }}</span><div class="muted">uploaded {{ rec.uploaded_at|dt }}</div>
+      {% else %}<span class="badge neutral">None</span>{% endif %}</td>
+    <td class="num">{{ rec.row_count if rec|has else '—' }}</td>
+    <td class="small nowrap">{% if rec|has %}{{ rec.export_date }}
+      {% if row.stale|has %}<br><span class="badge warn">Stale · {{ row.age }} days</span>{% endif %}{% endif %}</td>
+    <td class="small">{% if rec|has %}
+      {% if row.missing|has %}<a class="badge bad" href="{{ url('mapping', {kind: spec.kind}) }}">{{ row.missing|length }} unmapped</a>
+      {% else %}<a class="badge good" href="{{ url('mapping', {kind: spec.kind}) }}">Mapped</a>{% endif %}
+    {% endif %}</td>
+    <td>
+      <form method="post" action="{{ url('upload', {kind: spec.kind}) }}" enctype="multipart/form-data" class="row" style="gap:6px">
+        {{ csrf_field() }}
+        <input type="file" name="file" accept=".csv" required style="max-width:200px" aria-label="CSV file for {{ spec.label }}">
+        <input type="date" name="export_date" value="{{ today }}" style="width:auto" title="Date the file was exported from the source tool" aria-label="Export date">
+        <button class="small" type="submit">Upload</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="muted small">Sample CSVs to copy the format from are in <span class="mono">service_assessment/sample_data/</span>
+  (regenerate with <span class="mono">python -m service_assessment.sample_data</span>).</p>
+{% endblock %}

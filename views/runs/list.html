@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Assessment runs{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Assessment runs</h1><p class="muted">Every run is a dated snapshot with the files and thresholds it used.</p></div>
+  <a class="btn primary" href="{{ url('start') }}">New assessment</a>
+</div>
+<div class="card table-wrap">
+  {% if runs|has %}
+  <table>
+    <thead><tr><th>Run</th><th>Service</th><th>As of</th><th>Run at (UTC)</th><th class="num">Applications</th><th class="num">Assets</th><th class="num">Score</th><th>Rating</th></tr></thead>
+    <tbody>
+    {% for r in runs %}
+    <tr><td><a href="{{ url('run_overview', {run_id: r.id}) }}">#{{ r.id }}</a></td><td>{{ r.service_name }}</td><td>{{ r.as_of }}</td>
+      <td class="small">{{ r.created_at|dt }}</td><td class="num">{{ r.applications|length }}</td>
+      <td class="num">{{ r.asset_count }}</td><td class="num">{{ ((r.score)|g) }}</td>
+      <td>{% if r.mode == 'step' and (r.progress or 0) <= 11 %}<a class="badge info" href="{{ url('run_step', {run_id: r.id, n: r.progress}) }}">In progress · step {{ r.progress }}</a>{% else %}<span class="badge {{ RATING_CLASS[r.rating] }}">{{ r.rating }}</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<p class="muted">No runs yet. <a href="{{ url('start') }}">Start an assessment</a>.</p>{% endif %}
+</div>
+{% endblock %}

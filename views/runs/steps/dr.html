@@ -1,0 +1,71 @@
+{% if not (dr|has) %}
+<div class="notice info">This run was made before DR test results were assessed. Run a new assessment to see them.</div>
+{% else %}
+{% set tol = run.impact_tolerance_hours %}
+{% set rec_class = {'proven': 'good', 'thin': 'warn', 'exceeds': 'crit', 'untested': 'crit', 'unproven': 'bad'} %}
+{% set rec_label = {'proven': 'Within tolerance', 'thin': 'Thin margin', 'exceeds': 'Exceeds tolerance', 'untested': 'Untested', 'unproven': 'Unproven'} %}
+<div class="grid cols-4">
+  <div class="card tight stat accent-info"><span class="label">Impact tolerance</span><span class="value">{{ ((tol)|g) }}h</span><span class="sub">Thin margin below {{ ((run.settings.thin_margin_pct)|g) }}% of it</span></div>
+  <div class="card tight stat accent-crit"><span class="label">Exceed tolerance or untested</span><span class="value">{{ dr|where_in('recovery.status', ['exceeds', 'untested', 'unproven'])|list|length }}</span><span class="sub">Treated as exceeding tolerance</span></div>
+  <div class="card tight stat accent-warn"><span class="label">Thin margin</span><span class="value">{{ dr|where('recovery.status', 'thin')|list|length }}</span></div>
+  <div class="card tight stat accent-neutral"><span class="label">Within tolerance with margin</span><span class="value">{{ dr|where('recovery.status', 'proven')|list|length }}</span></div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>Recovery time against tolerance</h2><span class="spacer"></span><span class="small muted">Achieved in the latest DR test · tolerance line at {{ ((tol)|g) }}h</span></div>
+  {% set scale = dr_scale %}
+  {% for d in dr %}
+  {% set rc = d.recovery %}
+  <div class="meter-row">
+    <div><strong>{{ d.name }}</strong><div class="small muted">{% if d.test|has %}{{ d.test.test_type or 'Test' }} · {{ d.test.test_date }}{% else %}No test recorded{% endif %}</div></div>
+    <div class="meter" style="overflow:visible" title="{{ d.name }}: {{ (((rc.achieved)|g) ~ 'h') if rc.achieved != none else 'no recovery time' }} vs {{ ((tol)|g) }}h tolerance">
+      {% if rc.achieved != none %}<span class="{{ {'proven': 'good', 'thin': 'warn', 'exceeds': 'crit', 'unproven': 'bad', 'untested': 'crit'}[rc.status] }}" style="width:{{ 100 * rc.achieved / scale }}%"></span>{% endif %}
+      <i style="position:absolute;left:{{ 100 * tol / scale }}%;top:-5px;bottom:-5px;width:2px;background:var(--ink);border-radius:1px"></i>
+    </div>
+    <span class="num">{{ (((rc.achieved)|g) ~ 'h') if rc.achieved != none else '—' }}</span>
+    <span class="badge {{ rec_class[rc.status] }}">{{ rec_label[rc.status] }}</span>
+  </div>
+  {% endfor %}
+  <p class="small muted" style="margin:10px 0 0">The dark line marks the {{ ((tol)|g) }}-hour impact tolerance. An application whose latest test is missing, out of date, failed or partial is treated as exceeding tolerance even if it recovered quickly.</p>
+</div>
+
+<div class="card table-wrap">
+  <h2>Latest DR test per application</h2>
+  <table>
+    <thead><tr><th>Application</th><th>Test</th><th class="num">RTO · achieved</th><th class="num">RPO · data loss</th>{% for c in ['D1', 'D2', 'D3', 'D4'] %}<th title="{{ CHECKS[c].name }}">{{ c }}</th>{% endfor %}</tr></thead>
+    <tbody>
+    {% for d in dr %}{% set t = d.test %}
+    <tr>
+      <td><strong>{{ d.name }}</strong><div class="mono muted small">{{ d.id }}</div></td>
+      <td class="small">{% if t|has %}{{ t.test_type or '—' }} · {{ t.test_date }}<div class="muted">{{ t.age_days }} days ago · result {{ t.result or '—' }}</div>
+        {% if t.scope|has %}<div class="muted mono">{{ t.scope }}</div>{% endif %}
+        {% if t.open_issues|has %}<div style="margin-top:4px">Open: {{ t.open_issues }}{% if t.issue_due_date|has %} <span class="muted">(due {{ t.issue_due_date }})</span>{% endif %}</div>{% endif %}
+        {% else %}<span class="badge crit">No test</span>{% endif %}</td>
+      <td class="num small nowrap">{% if t|has %}{{ t.rto_hours }}h · <strong>{{ t.achieved_rto_hours }}h</strong>{% else %}—{% endif %}</td>
+      <td class="num small nowrap">{% if t|has %}{{ t.rpo_hours if t.rpo_hours != '' else '—' }}h · <strong>{{ t.achieved_rpo_hours if t.achieved_rpo_hours != '' else '—' }}h</strong>{% else %}—{% endif %}</td>
+      {% for c in ['D1', 'D2', 'D3', 'D4'] %}{% set r = app_results[d.id ~ '|' ~ c] %}
+      <td>{% if r|has %}<a class="badge {{ STATUS_CLASS[r.status] }}" href="{{ url('result_detail', {run_id: run.id, result_id: r.id}) }}" title="{{ r.detail }}">{{ STATUS_LABELS[r.status] }}</a>{% endif %}</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">D1 needs a passed test within {{ ((run.settings.dr_test_max_age_days)|g) }} days whose scope covers every registered asset of the application. Hover a badge for the detail; select it for the evidence.</p>
+</div>
+
+<div class="card">
+  <h2>Scenarios: demonstrated recovery</h2>
+  <table>
+    <thead><tr><th>Scenario</th><th>Applications</th><th>Recovery position</th><th>Rating</th></tr></thead>
+    <tbody>
+    {% for s in run.scenario_results %}
+    <tr><td><strong>{{ s.name }}</strong></td><td class="small">{{ s.applications|join(', ') }}</td>
+      <td class="small">{% if s.recovery|has %}<span class="badge {{ rec_class[s.recovery.status] }}">{{ rec_label[s.recovery.status] }}</span>
+        <div class="muted" style="margin-top:4px">{{ s.recovery.label|capfirst }}.</div>{% else %}—{% endif %}</td>
+      <td><span class="badge {{ RATING_CLASS[s.rating] }}">{{ s.rating }}</span></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">A scenario ends only when all its applications are back, so it takes the slowest or least-proven application's position.</p>
+</div>
+{% endif %}
